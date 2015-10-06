@@ -2,43 +2,55 @@ var display = require("./display.js");
 var generator = require("./generator.js");
 
 function Timer() {
+    var startTime,
+        endTime;
+
     var inst = {};
     inst.reset = function() {
-        inst.start = undefined;
-        inst.end = undefined;
+        startTime = undefined;
+        endTime = undefined;
     };
-    inst.run = function() {
-        inst.start = Date.now();
+    inst.start = function() {
+        startTime = Date.now();
     };
     inst.stop = function() {
-        inst.end = Date.now();
+        endTime = Date.now();
     };
     inst.get = function() {
-        if(inst.end === undefined)
-            return Date.now() - inst.start;
+        console.log(startTime);
+        console.log(endTime);
+        if(endTime === undefined)
+            return Date.now() - startTime;
         else
-            return inst.end - inst.start;
+            return (endTime - startTime) / 1000;
     };
     inst.started = function() {
-        return inst === undefined;
+        return startTime !== undefined;
     }
     return inst;
 }
 
 function Text() {
     var session     = 0,
+        errors      = 0,
         text        = "",
+        author      = "",
         complete    = false;
 
     var inst = {};
     inst.next = function() {
-        text = generator.next();
+        var nextText = generator.next();
+        text = nextText.text;
+        author = nextText.author;
         complete = false;
         errors = 0;
         session++;
     }
     inst.compare = function(input) {
+        errors = 0;
+        var WORD_LIMIT = 110; //REACTOR LATER
         var data = [];
+        var word = [];
         for(var i = 0; i < text.length; i++) {
             var d = {};
             var c1 = text.charAt(i);
@@ -52,9 +64,19 @@ function Text() {
                 d.state = 1;
             } else {
                 d.state = -1;
+                errors++;
             }
-            data.push(d);
+            word.push(d);
+            if(c1 === " ") {
+                data.push(word);
+                word = [];
+            }
         }
+        if(word.length > 0)
+            data.push(word);
+        while(data.length < WORD_LIMIT)
+            data.push([]);
+
         if(input.length >= text.length)
             complete = true;
         return data;
@@ -62,18 +84,14 @@ function Text() {
     inst.finished = function() {
         return complete;
     };
-    return inst;
-}
-
-function Stats(timer, text) {
-    var inst = {};
-    inst.reset = function() {
-        inst.wpm = 0;
-        inst.acc = 0;
+    inst.getAuthor = function() {
+        return author;
     };
-    inst.calculate = function() {
-        //wpm is correct text typed per time spent typing
-        //acc is 1 - errors / correct text
+    inst.findACC = function(input) {
+        return Math.floor((text.length-errors)/text.length*10000)/100;
+    };
+    inst.findWPM = function(time) {
+        return Math.floor((text.length - errors)/5/time*6000)/100;
     };
     return inst;
 }
@@ -81,34 +99,45 @@ function Stats(timer, text) {
 function setup() {
     text.next();
     timer.reset();
-    stats.reset();
+
     display.resetInput();
+    display.setAuthor(text.getAuthor());
+    display.hideScore();
+
     updateText("");
-    updateStats();
 }
 
 function updateText(input) {
     var data = text.compare(input);
-    display.renderScreen(data);
+    display.renderText(data);
 }
 
 function updateStats() {
-    //display.renderStats();
+    display.setStats(text.findWPM(timer.get()), text.findACC());
 }
 
 module.exports.type = function(input) {
     if(text.finished()) {
-        setup();
+        return;
     } else{
         if(!timer.started()) { 
-            timer.run();
+            timer.start();
         }
         updateText(input);
+        if(text.finished()) {
+            timer.stop();
+            updateStats();
+            display.showScore();
+        }
     }
 };
 
+module.exports.nextSession = function() {
+    if(text.finished())
+        setup();
+}
+
 var timer = Timer();
 var text = Text();
-var stats = Stats(timer, text);
 
 setup();

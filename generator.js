@@ -1,11 +1,9 @@
+var quotes = require("./quotes.json");
 var counter = 0;
-var texts = [
-    "This is one",
-    "Two",
-    "Three",
-    "Four"
-];
 
+function rand(min, max) {
+    return Math.floor(Math.random() * (max - min)) + min;
+}
 module.exports.next = function() {
-    return texts[counter++ % texts.length];
+    return quotes[rand(0, quotes.length)];
 }

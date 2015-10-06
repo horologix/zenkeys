@@ -1,1 +1,1 @@
-browserify app.js -o ../../public/keys/main.js
+browserify app.js | uglifyjs > ../../public/keys/main.js
